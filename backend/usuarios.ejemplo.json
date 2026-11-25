@@ -1,0 +1,20 @@
+[
+  {
+    "usuario": "logistica",
+    "nombre": "Logística",
+    "perfil": "logistica",
+    "clave": "cambiar-clave"
+  },
+  {
+    "usuario": "contabilidad",
+    "nombre": "Contabilidad",
+    "perfil": "contabilidad",
+    "clave": "cambiar-clave"
+  },
+  {
+    "usuario": "admin",
+    "nombre": "Administrador",
+    "perfil": "admin",
+    "clave": "cambiar-clave"
+  }
+]
