@@ -187,6 +187,15 @@ test("el administrador agrega, edita y elimina usuarios", async () => {
   assert.equal(denegado.status, 403)
 
   const admin = await entrar("admin")
+  const conEspacios = await fetch(`${base}/api/paso/usuarios`, {
+    method: "POST",
+    headers: { cookie: admin, "content-type": "application/json" },
+    body: JSON.stringify({ usuario: "Ana María", nombre: "Ana María", perfil: "logistica", clave: "ana123" }),
+  })
+  assert.equal(conEspacios.status, 201)
+  assert.equal((await conEspacios.json()).usuario, "anamaria")
+  await fetch(`${base}/api/paso/usuarios/anamaria`, { method: "DELETE", headers: { cookie: admin } })
+
   const creado = await fetch(`${base}/api/paso/usuarios`, {
     method: "POST",
     headers: { cookie: admin, "content-type": "application/json" },

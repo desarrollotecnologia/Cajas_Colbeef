@@ -13,6 +13,10 @@ function normalizar(valor) {
   return String(valor || "").trim().toLowerCase().normalize("NFD").replace(/\p{M}/gu, "")
 }
 
+function accesoDe(valor) {
+  return normalizar(valor).replace(/[^a-z0-9._-]/g, "")
+}
+
 function rechazo(estado, mensaje) {
   const error = new Error(mensaje)
   error.estado = estado
@@ -33,8 +37,8 @@ function guardarCuentas(cuentas) {
 }
 
 function cuentaValida({ usuario, nombre, perfil, clave }, exigeClave) {
-  const acceso = normalizar(usuario)
-  if (!/^[a-z0-9._-]{3,40}$/.test(acceso)) throw rechazo(400, "El usuario admite letras, números y un punto, de 3 a 40 caracteres.")
+  const acceso = accesoDe(usuario)
+  if (!/^[a-z0-9._-]{3,40}$/.test(acceso)) throw rechazo(400, "El usuario necesita al menos 3 letras o números. Puedes escribir el nombre con espacios.")
   const visible = String(nombre || "").trim()
   if (visible.length < 2 || visible.length > 80) throw rechazo(400, "El nombre debe tener entre 2 y 80 caracteres.")
   if (!PERFILES.has(perfil)) throw rechazo(400, "El perfil debe ser Logística, Contabilidad o Administrador.")
@@ -51,7 +55,7 @@ export function listarCuentas() {
 export function crearCuenta(datos) {
   const cuenta = cuentaValida(datos, true)
   const cuentas = leerCuentas()
-  if (cuentas.some((item) => normalizar(item.usuario) === cuenta.acceso)) throw rechazo(409, "Ese usuario ya existe.")
+  if (cuentas.some((item) => accesoDe(item.usuario) === cuenta.acceso)) throw rechazo(409, "Ese usuario ya existe.")
   cuentas.push({ usuario: cuenta.acceso, nombre: cuenta.visible, perfil: cuenta.perfil, clave: cuenta.secreta })
   guardarCuentas(cuentas)
   return { usuario: cuenta.acceso, nombre: cuenta.visible, perfil: cuenta.perfil }
@@ -59,10 +63,10 @@ export function crearCuenta(datos) {
 
 export function actualizarCuenta(usuario, datos) {
   const cuentas = leerCuentas()
-  const indice = cuentas.findIndex((item) => normalizar(item.usuario) === normalizar(usuario))
+  const indice = cuentas.findIndex((item) => accesoDe(item.usuario) === accesoDe(usuario))
   if (indice < 0) throw rechazo(404, "No existe ese usuario.")
   const cuenta = cuentaValida({ ...datos, clave: datos.clave || cuentas[indice].clave }, false)
-  if (cuentas.some((item, posicion) => posicion !== indice && normalizar(item.usuario) === cuenta.acceso)) {
+  if (cuentas.some((item, posicion) => posicion !== indice && accesoDe(item.usuario) === cuenta.acceso)) {
     throw rechazo(409, "Ese usuario ya existe.")
   }
   const administradores = cuentas.filter((item) => item.perfil === "admin").length
@@ -81,7 +85,7 @@ export function actualizarCuenta(usuario, datos) {
 
 export function eliminarCuenta(usuario) {
   const cuentas = leerCuentas()
-  const indice = cuentas.findIndex((item) => normalizar(item.usuario) === normalizar(usuario))
+  const indice = cuentas.findIndex((item) => accesoDe(item.usuario) === accesoDe(usuario))
   if (indice < 0) throw rechazo(404, "No existe ese usuario.")
   const administradores = cuentas.filter((item) => item.perfil === "admin").length
   if (cuentas[indice].perfil === "admin" && administradores < 2) throw rechazo(400, "Debe quedar al menos un administrador.")
@@ -104,9 +108,9 @@ export function autenticar(usuario, clave) {
     return null
   }
   if (!Array.isArray(cuentas)) return null
-  const buscado = normalizar(usuario)
+  const buscado = accesoDe(usuario)
   const claveIngresada = String(clave || "")
-  const cuenta = cuentas.find((item) => normalizar(item.usuario) === buscado)
+  const cuenta = cuentas.find((item) => accesoDe(item.usuario) === buscado)
   if (!cuenta || !PERFILES.has(cuenta.perfil) || !mismas(String(cuenta.clave || ""), claveIngresada)) return null
   return {
     usuario: String(cuenta.nombre || cuenta.usuario).trim(),

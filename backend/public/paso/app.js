@@ -628,7 +628,7 @@ function dibujarUsuarios(cuentas, edicion = null) {
     <p class="ayuda">${edicion ? `Editando ${escapar(edicion.usuario)}. Deja la clave vacía si no quieres cambiarla.` : "Crea una cuenta para Logística, Contabilidad o Administrador."}</p>
     <form id="cuenta" class="rejilla-cuenta">
       <input type="hidden" name="original" value="${escapar(edicion?.usuario || "")}" />
-      <label>Usuario<input name="usuario" type="text" maxlength="40" required value="${escapar(edicion?.usuario || "")}" /></label>
+      <label>Usuario<input name="usuario" type="text" maxlength="80" required value="${escapar(edicion?.usuario || "")}" /></label>
       <label>Nombre<input name="nombre" type="text" maxlength="80" required value="${escapar(edicion?.nombre || "")}" /></label>
       <label>Perfil<select name="perfil">${opciones}</select></label>
       <label>Clave<input name="clave" type="password" maxlength="80" ${edicion ? "" : "required"} placeholder="${edicion ? "Sin cambio" : ""}" /></label>
