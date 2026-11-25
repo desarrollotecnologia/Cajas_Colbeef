@@ -565,12 +565,116 @@ function pantallaAdmin() {
   salir.hidden = false
   panel(`
     <h2>Administrador</h2>
-    <p class="ayuda">Abre la carga de Logística o la revisión de Contabilidad.</p>
+    <p class="ayuda">Abre la carga de Logística, la revisión de Contabilidad o las cuentas de acceso.</p>
     <div class="perfiles">
-      <a class="btn btn-primary" href="#logistica">Registrar documento y referencia</a>
+      <a class="btn btn-primary" href="#usuarios">Usuarios</a>
+      <a class="btn btn-ghost" href="#logistica">Registrar documento y referencia</a>
       <a class="btn btn-ghost" href="#contabilidad">Cargar el Excel y revisar</a>
     </div>
+    <p class="secreto"><a href="#uso">Uso del programa</a></p>
   `)
+}
+
+const PERFILES_USUARIO = [
+  ["logistica", "Logística"],
+  ["contabilidad", "Contabilidad"],
+  ["admin", "Administrador"],
+]
+
+function pantallaUso() {
+  lede.textContent = `${sesion.usuario} · Administrador`
+  salir.hidden = false
+  panel(`
+    <p><a href="#admin">Volver al inicio</a></p>
+    <h2>Uso del programa</h2>
+    <p class="ayuda">Esta guía solo la ve el administrador.</p>
+    <h3>Logística</h3>
+    <p class="ayuda">Elige la fecha y consulta. La tabla sale de SIRT: cliente, cantidad, lote y el resto. Logística solo escribe el documento SIMED, por ejemplo H7-403, y confirma la referencia de la caja. Olímpica queda siempre en 30-10-100019. Los demás parten de 30-10-24 y pueden elegir 30-10-25, 30-10-26 o 30-10-45. Si un texto es largo, la flecha lo abre. Guardar deja el documento listo para Contabilidad. La fecha del cargue se guarda sola y no se muestra en esta tabla.</p>
+    <h3>Contabilidad</h3>
+    <p class="ayuda">Sube una vez el Excel de paso de comprobantes. Queda guardado: al recargar, y cada 15 segundos, se vuelve a cruzar con lo que Logística haya guardado. El encabezado de las columnas se queda fijo al bajar. Hacia los lados solo se mueve la tabla. El centro de costo correcto es 309 para Olímpica y 600 para los demás. Las unidades se comparan con las que Logística registró para ese documento y esa referencia. Si falta el cruce o no coinciden, la celda queda marcada y el detalle está en Diferencias. Realizados lista los documentos que ya se cargaron, con el día, el cliente, la referencia y la cantidad.</p>
+    <h3>Administrador</h3>
+    <p class="ayuda">Puede abrir Logística y Contabilidad. En Usuarios crea, edita y elimina las cuentas. Siempre debe quedar al menos un administrador, y no se puede borrar la cuenta con la que se entró. Esta guía no aparece para los otros roles.</p>
+  `)
+}
+
+async function pantallaUsuarios() {
+  lede.textContent = `${sesion.usuario} · Administrador`
+  salir.hidden = false
+  panel(`<h2>Usuarios</h2><p class="ayuda">Cargando.</p>`)
+  try {
+    const cuentas = await api("/api/paso/usuarios")
+    dibujarUsuarios(cuentas)
+  } catch (error) {
+    panel(`<p><a href="#admin">Volver al inicio</a></p><h2>Usuarios</h2><p class="aviso">${escapar(error.message)}</p>`)
+  }
+}
+
+function dibujarUsuarios(cuentas, edicion = null) {
+  const opciones = PERFILES_USUARIO.map(([valor, etiqueta]) => `<option value="${valor}"${edicion?.perfil === valor ? " selected" : ""}>${etiqueta}</option>`).join("")
+  const filas = cuentas.map((cuenta) => `
+    <tr>
+      <td>${escapar(cuenta.usuario)}</td>
+      <td>${escapar(cuenta.nombre)}</td>
+      <td>${escapar(NOMBRES[cuenta.perfil] || cuenta.perfil)}</td>
+      <td class="acciones">
+        <button class="btn btn-ghost" type="button" data-editar="${escapar(cuenta.usuario)}">Editar</button>
+        <button class="btn btn-ghost" type="button" data-eliminar="${escapar(cuenta.usuario)}"${cuenta.usuario === sesion.cuenta ? " disabled" : ""}>Eliminar</button>
+      </td>
+    </tr>
+  `).join("")
+  panel(`
+    <p><a href="#admin">Volver al inicio</a></p>
+    <h2>Usuarios</h2>
+    <p class="ayuda">${edicion ? `Editando ${escapar(edicion.usuario)}. Deja la clave vacía si no quieres cambiarla.` : "Crea una cuenta para Logística, Contabilidad o Administrador."}</p>
+    <form id="cuenta" class="rejilla-cuenta">
+      <input type="hidden" name="original" value="${escapar(edicion?.usuario || "")}" />
+      <label>Usuario<input name="usuario" type="text" maxlength="40" required value="${escapar(edicion?.usuario || "")}" /></label>
+      <label>Nombre<input name="nombre" type="text" maxlength="80" required value="${escapar(edicion?.nombre || "")}" /></label>
+      <label>Perfil<select name="perfil">${opciones}</select></label>
+      <label>Clave<input name="clave" type="password" maxlength="80" ${edicion ? "" : "required"} placeholder="${edicion ? "Sin cambio" : ""}" /></label>
+      <div class="acciones">
+        <button class="btn btn-primary" type="submit">${edicion ? "Guardar cambios" : "Agregar"}</button>
+        ${edicion ? `<button class="btn btn-ghost" type="button" id="cancelar-cuenta">Cancelar</button>` : ""}
+      </div>
+      <p class="aviso" id="aviso"></p>
+    </form>
+    <div class="tabla-marco tabla-diferencias"><table><thead><tr><th>USUARIO</th><th>NOMBRE</th><th>PERFIL</th><th></th></tr></thead><tbody>${filas}</tbody></table></div>
+  `)
+  vista.querySelector("#cancelar-cuenta")?.addEventListener("click", () => dibujarUsuarios(cuentas))
+  vista.querySelectorAll("[data-editar]").forEach((boton) => {
+    boton.addEventListener("click", () => dibujarUsuarios(cuentas, cuentas.find((cuenta) => cuenta.usuario === boton.dataset.editar)))
+  })
+  vista.querySelectorAll("[data-eliminar]").forEach((boton) => {
+    boton.addEventListener("click", async () => {
+      if (!confirm(`Eliminar el usuario ${boton.dataset.eliminar}?`)) return
+      try {
+        await api(`/api/paso/usuarios/${encodeURIComponent(boton.dataset.eliminar)}`, { method: "DELETE" })
+        await pantallaUsuarios()
+      } catch (error) {
+        vista.querySelector("#aviso").textContent = error.message
+      }
+    })
+  })
+  vista.querySelector("#cuenta").addEventListener("submit", async (evento) => {
+    evento.preventDefault()
+    const aviso = vista.querySelector("#aviso")
+    const datos = new FormData(evento.target)
+    const original = datos.get("original")
+    const cuerpo = {
+      usuario: datos.get("usuario"),
+      nombre: datos.get("nombre"),
+      perfil: datos.get("perfil"),
+      clave: datos.get("clave"),
+    }
+    aviso.textContent = ""
+    try {
+      if (original) await api(`/api/paso/usuarios/${encodeURIComponent(original)}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo) })
+      else await api("/api/paso/usuarios", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo) })
+      await pantallaUsuarios()
+    } catch (error) {
+      aviso.textContent = error.message
+    }
+  })
 }
 
 function puede(seccion) {
@@ -600,6 +704,14 @@ async function dibujar() {
   }
   if (seccion === "admin") {
     pantallaAdmin()
+    return
+  }
+  if (seccion === "usuarios") {
+    pantallaUsuarios()
+    return
+  }
+  if (seccion === "uso") {
+    pantallaUso()
     return
   }
   pantallaDespachos()

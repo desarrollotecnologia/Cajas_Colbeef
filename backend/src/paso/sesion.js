@@ -28,10 +28,10 @@ export function perfilValido(perfil) {
   return PERFILES.has(perfil)
 }
 
-export function abrirSesion(perfil, usuario) {
+export function abrirSesion(perfil, usuario, cuenta) {
   const sesiones = leer()
   const token = randomUUID()
-  sesiones[token] = { perfil, usuario, desde: new Date().toISOString() }
+  sesiones[token] = { perfil, usuario, cuenta: cuenta || null, desde: new Date().toISOString() }
   guardar(sesiones)
   return token
 }

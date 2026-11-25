@@ -172,11 +172,47 @@ test("solo Logística guarda el documento SIMED", async () => {
 test("el administrador entra a la carga y a la revisión", async () => {
   const admin = await entrar("admin")
   const sesion = await fetch(`${base}/api/paso/sesion`, { headers: { cookie: admin } })
-  assert.deepEqual(await sesion.json(), { perfil: "admin", usuario: "Administrador" })
+  assert.deepEqual(await sesion.json(), { perfil: "admin", usuario: "Administrador", cuenta: "admin" })
   const lista = await fetch(`${base}/api/paso/cargas`, { headers: { cookie: admin } })
   assert.equal(lista.status, 200)
   const documento = new FormData()
   documento.set("documento", new Blob([JSON.stringify(comprobante(200, "890107487", OLIMPICA))], { type: "application/json" }), "admin.json")
   const carga = await fetch(`${base}/api/paso/cargas`, { method: "POST", headers: { cookie: admin }, body: documento })
   assert.equal(carga.status, 201)
+})
+
+test("el administrador agrega, edita y elimina usuarios", async () => {
+  const logistica = await entrar("logistica")
+  const denegado = await fetch(`${base}/api/paso/usuarios`, { headers: { cookie: logistica } })
+  assert.equal(denegado.status, 403)
+
+  const admin = await entrar("admin")
+  const creado = await fetch(`${base}/api/paso/usuarios`, {
+    method: "POST",
+    headers: { cookie: admin, "content-type": "application/json" },
+    body: JSON.stringify({ usuario: "bodega", nombre: "Bodega Norte", perfil: "logistica", clave: "bodega" }),
+  })
+  assert.equal(creado.status, 201)
+  const lista = await fetch(`${base}/api/paso/usuarios`, { headers: { cookie: admin } })
+  const cuentas = await lista.json()
+  assert.equal(cuentas.some((cuenta) => cuenta.usuario === "bodega" && cuenta.clave === undefined), true)
+
+  const editado = await fetch(`${base}/api/paso/usuarios/bodega`, {
+    method: "PUT",
+    headers: { cookie: admin, "content-type": "application/json" },
+    body: JSON.stringify({ usuario: "bodega", nombre: "Bodega Sur", perfil: "contabilidad", clave: "" }),
+  })
+  assert.equal(editado.status, 200)
+  assert.equal((await editado.json()).nombre, "Bodega Sur")
+
+  const propio = await fetch(`${base}/api/paso/usuarios/admin`, { method: "DELETE", headers: { cookie: admin } })
+  assert.equal(propio.status, 400)
+  const borrado = await fetch(`${base}/api/paso/usuarios/bodega`, { method: "DELETE", headers: { cookie: admin } })
+  assert.equal(borrado.status, 200)
+  const entrada = await fetch(`${base}/api/paso/sesion`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ usuario: "bodega", clave: "bodega" }),
+  })
+  assert.equal(entrada.status, 401)
 })

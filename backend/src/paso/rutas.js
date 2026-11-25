@@ -6,7 +6,7 @@ import { confirmacion, contenidoSimed, crearCarga, guardarExcelContable, guardar
 import { aplicarDocumentos, guardarDocumentos, listarRealizados, registrosParaCruce } from "./documentos.js"
 import { aplicarReferencias, guardarReferencias, REFERENCIAS_CAJA } from "./referencias.js"
 import { leerExcelContable, leerSimed } from "./simed.js"
-import { autenticar } from "./cuentas.js"
+import { actualizarCuenta, autenticar, crearCuenta, eliminarCuenta, listarCuentas } from "./cuentas.js"
 import { abrirSesion, cerrarSesion, sesionDe, tokenDe } from "./sesion.js"
 import { maestroDesdeEmpresas, validarContraLogistica, validarFilas } from "./validar.js"
 import { totalizarPorCliente } from "./totalizar.js"
@@ -35,7 +35,7 @@ rutasPaso.post("/sesion", (req, res, next) => {
   try {
     const cuenta = autenticar(req.body?.usuario, req.body?.clave)
     if (!cuenta) throw fallo(401, "Usuario o clave incorrectos.")
-    const token = abrirSesion(cuenta.perfil, cuenta.usuario)
+    const token = abrirSesion(cuenta.perfil, cuenta.usuario, cuenta.cuenta)
     res.setHeader("Set-Cookie", `paso=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200`)
     res.json(cuenta)
   } catch (error) {
@@ -55,7 +55,54 @@ rutasPaso.get("/sesion", (req, res) => {
     res.json({ perfil: null })
     return
   }
-  res.json({ perfil: sesion.perfil, usuario: sesion.usuario })
+  res.json({ perfil: sesion.perfil, usuario: sesion.usuario, cuenta: sesion.cuenta || null })
+})
+
+function exigirAdmin(req) {
+  const sesion = sesionDe(tokenDe(req))
+  if (!sesion) throw fallo(401, "Entra con tu usuario para continuar.")
+  if (sesion.perfil !== "admin") throw fallo(403, "Solo el administrador gestiona los usuarios.")
+  return sesion
+}
+
+rutasPaso.get("/usuarios", (req, res, next) => {
+  try {
+    exigirAdmin(req)
+    res.json(listarCuentas())
+  } catch (error) {
+    next(error)
+  }
+})
+
+rutasPaso.post("/usuarios", (req, res, next) => {
+  try {
+    exigirAdmin(req)
+    res.status(201).json(crearCuenta(req.body || {}))
+  } catch (error) {
+    next(error)
+  }
+})
+
+rutasPaso.put("/usuarios/:usuario", (req, res, next) => {
+  try {
+    exigirAdmin(req)
+    res.json(actualizarCuenta(req.params.usuario, req.body || {}))
+  } catch (error) {
+    next(error)
+  }
+})
+
+rutasPaso.delete("/usuarios/:usuario", (req, res, next) => {
+  try {
+    const sesion = exigirAdmin(req)
+    if (sesion.cuenta && sesion.cuenta === String(req.params.usuario)) {
+      throw fallo(400, "No puedes eliminar el usuario con el que entraste.")
+    }
+    eliminarCuenta(req.params.usuario)
+    res.json({ ok: true })
+  } catch (error) {
+    next(error)
+  }
 })
 
 function leerMultipart(req) {
