@@ -14,7 +14,7 @@ function normalizar(valor) {
 }
 
 function accesoDe(valor) {
-  return normalizar(valor).replace(/[^a-z0-9._-]/g, "")
+  return normalizar(valor).replace(/[^a-z0-9._@-]/g, "")
 }
 
 function rechazo(estado, mensaje) {
@@ -38,7 +38,7 @@ function guardarCuentas(cuentas) {
 
 function cuentaValida({ usuario, nombre, perfil, clave }, exigeClave) {
   const acceso = accesoDe(usuario)
-  if (!/^[a-z0-9._-]{3,40}$/.test(acceso)) throw rechazo(400, "El usuario necesita al menos 3 letras o números. Puedes escribir el nombre con espacios.")
+  if (!/^[a-z0-9._@-]{3,80}$/.test(acceso)) throw rechazo(400, "Escribe el usuario o el correo, con al menos 3 caracteres.")
   const visible = String(nombre || "").trim()
   if (visible.length < 2 || visible.length > 80) throw rechazo(400, "El nombre debe tener entre 2 y 80 caracteres.")
   if (!PERFILES.has(perfil)) throw rechazo(400, "El perfil debe ser Logística, Contabilidad o Administrador.")
