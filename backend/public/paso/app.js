@@ -39,10 +39,15 @@ function regresoAdmin() {
   return sesion.perfil === "admin" ? `<p><a href="#admin">Volver al inicio</a></p>` : ""
 }
 
+function mostrarIngreso() {
+  if (location.hash) history.replaceState(null, "", location.pathname + location.search)
+}
+
 function entrada() {
   detenerRefresco()
   lede.textContent = "Cada rol entra con su usuario. El administrador puede abrir las dos pantallas."
   salir.hidden = true
+  mostrarIngreso()
   panel(`
     <h2>Ingresar</h2>
     <form id="login">
@@ -170,29 +175,36 @@ async function pantallaDespachos() {
       ? "Info SIRT: la fecha, el cliente, la cantidad y el resto de la tabla salen de SIRT. El documento SIMED y la referencia de la caja no vienen de allí; Logística los escribe en esta pantalla. El archivo lo carga Contabilidad."
       : "Revisa el documento SIMED que escribió Logística. Lo que está vacío todavía no tiene identificador."}</p>
     <form id="consulta" class="acciones">
-      <label>Fecha<input id="fecha" name="fecha" type="date" required /></label>
+      ${filtroPeriodo()}
       <button class="btn btn-primary" type="submit">Consultar</button>
     </form>
     <p class="aviso" id="aviso"></p>
     <div id="tabla"></div>
+    <details class="desplegable realizado">
+      <summary>Realizados <span id="realizados-cuenta"></span></summary>
+      <div class="cuerpo" id="realizados-tabla"><p class="ayuda">Cargando los realizados.</p></div>
+    </details>
   `)
+  enlazarPeriodo(vista.querySelector("#consulta"))
+  cargarRealizados()
   vista.querySelector("#consulta").addEventListener("submit", async (evento) => {
     evento.preventDefault()
     const aviso = vista.querySelector("#aviso")
-    const fecha = vista.querySelector("#fecha").value
+    const periodo = periodoDe(evento.target)
     aviso.textContent = ""
     vista.querySelector("#tabla").innerHTML = `<p class="ayuda">Consultando los despachos.</p>`
     try {
-      const cuerpo = await api(`/api/paso/despachos?fecha=${encodeURIComponent(fecha)}`)
+      const cuerpo = await api(`/api/paso/despachos?${periodo.consulta}`)
       if (!cuerpo.registros.length) {
-        vista.querySelector("#tabla").innerHTML = `<p class="ayuda">No hay despachos para esa fecha.</p>`
+        vista.querySelector("#tabla").innerHTML = `<p class="ayuda">${periodo.modo === "mes" ? "No hay despachos en ese mes." : "No hay despachos para esa fecha."}</p>`
         return
       }
       const pendientes = cuerpo.registros.filter((fila) => !fila.documentoSiimed).length
-      const guardar = editable
+      const puedeGuardar = editable && periodo.modo === "dia"
+      const guardar = puedeGuardar
         ? `<div class="acciones"><button class="btn btn-primary" id="guardar" type="button">Guardar</button><span class="ayuda">${pendientes} sin documento</span></div>`
-        : `<p class="ayuda">${cuerpo.registros.length - pendientes} con documento · ${pendientes} sin documento</p>`
-      vista.querySelector("#tabla").innerHTML = `${guardar}${tablaDespachos(cuerpo.registros, editable)}<p class="aviso" id="aviso-tabla"></p>`
+        : `<p class="ayuda">${periodo.modo === "mes" ? `${escapar(cuerpo.desde)} al ${escapar(cuerpo.hasta)}. ` : ""}${cuerpo.registros.length - pendientes} con documento · ${pendientes} sin documento${periodo.modo === "mes" ? ". Para guardar, consulta el día." : ""}</p>`
+      vista.querySelector("#tabla").innerHTML = `${guardar}${tablaDespachos(cuerpo.registros, puedeGuardar)}<p class="aviso" id="aviso-tabla"></p>`
       vista.querySelector("#guardar")?.addEventListener("click", guardarDocumentos)
       pegarEncabezado()
     } catch (error) {
@@ -202,10 +214,54 @@ async function pantallaDespachos() {
   })
 }
 
+async function cargarRealizados() {
+  const tabla = vista.querySelector("#realizados-tabla")
+  const cuenta = vista.querySelector("#realizados-cuenta")
+  if (!tabla) return
+  try {
+    const cuerpo = await api("/api/paso/realizados")
+    const filas = cuerpo.realizados || []
+    if (cuenta) cuenta.textContent = String(filas.length)
+    tabla.innerHTML = filas.length
+      ? `<div class="tabla-marco tabla-diferencias"><table><thead><tr><th>DÍA DEL CARGUE</th><th>DOCUMENTO</th><th>CLIENTE</th><th>REFERENCIA</th><th>CANTIDAD</th></tr></thead><tbody>${filas.map((fila) => `<tr><td>${escapar(diaVisible(fila.fecha) || "—")}</td><td>${escapar(fila.documento)}</td><td>${escapar(fila.cliente || "—")}</td><td>${escapar(fila.referencia || "—")}</td><td>${escapar(fila.cantidad ?? "—")}</td></tr>`).join("")}</tbody></table></div>`
+      : `<p class="ayuda">Todavía no hay cargues guardados.</p>`
+  } catch (error) {
+    tabla.innerHTML = `<p class="aviso">${escapar(error.message)}</p>`
+  }
+}
+
+function filtroPeriodo() {
+  return `
+    <label>Ver por<select name="modo"><option value="dia">Día</option><option value="mes">Mes</option></select></label>
+    <label data-modo="dia">Día<input name="fecha" type="date" required /></label>
+    <label data-modo="mes" hidden>Mes<input name="mes" type="month" /></label>
+  `
+}
+
+function enlazarPeriodo(formulario) {
+  const modo = formulario.querySelector("[name=modo]")
+  const aplicar = () => {
+    const mes = modo.value === "mes"
+    formulario.querySelectorAll("[data-modo]").forEach((etiqueta) => {
+      const activo = etiqueta.dataset.modo === (mes ? "mes" : "dia")
+      etiqueta.hidden = !activo
+      etiqueta.querySelector("input").required = activo
+    })
+  }
+  modo.addEventListener("change", aplicar)
+  aplicar()
+}
+
+function periodoDe(formulario) {
+  const modo = formulario.querySelector("[name=modo]").value === "mes" ? "mes" : "dia"
+  const valor = formulario.querySelector(modo === "mes" ? "[name=mes]" : "[name=fecha]").value
+  return { modo, consulta: `${modo === "mes" ? "mes" : "fecha"}=${encodeURIComponent(valor)}` }
+}
+
 async function guardarDocumentos() {
   const aviso = vista.querySelector("#aviso-tabla")
   const boton = vista.querySelector("#guardar")
-  const fecha = vista.querySelector("#fecha").value
+  const fecha = vista.querySelector("#consulta [name=fecha]").value
   const referenciaDe = new Map([...vista.querySelectorAll(".ref")].map((campo) => [campo.dataset.cliente, campo.value]))
   const registros = [...vista.querySelectorAll(".doc")].map((campo) => {
     const cliente = campo.dataset.cliente || ""
@@ -234,6 +290,18 @@ async function guardarDocumentos() {
   } finally {
     boton.disabled = false
   }
+}
+
+function diaVisible(valor) {
+  if (!valor) return ""
+  const fecha = new Date(valor)
+  if (Number.isNaN(fecha.getTime())) return ""
+  return new Intl.DateTimeFormat("es-CO", {
+    timeZone: "America/Bogota",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(fecha)
 }
 
 function fechaVisible(valor) {
@@ -720,7 +788,6 @@ async function dibujar() {
 salir.addEventListener("click", async () => {
   await api("/api/paso/sesion", { method: "DELETE" }).catch(() => {})
   sesion = { perfil: null, usuario: null }
-  location.hash = ""
   entrada()
 })
 

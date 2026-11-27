@@ -189,6 +189,27 @@ function rangoMes(mes) {
   }
 }
 
+rutasPaso.get("/realizados", async (req, res, next) => {
+  try {
+    exigirAlguno(req)
+    const mes = rangoMes(req.query.mes)
+    const fecha = String(req.query.fecha || "")
+    if (req.query.mes && !mes) throw fallo(400, "Elige un mes válido.")
+    if (req.query.fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) throw fallo(400, "Elige un día válido.")
+    const realizados = await listarRealizados(undefined, {
+      fecha: fecha && !req.query.mes ? fecha : "",
+      mes: mes ? String(req.query.mes) : "",
+    })
+    res.json({
+      realizados,
+      fecha: fecha && !req.query.mes ? fecha : null,
+      mes: mes ? String(req.query.mes) : null,
+    })
+  } catch (error) {
+    next(error)
+  }
+})
+
 rutasPaso.get("/despachos", async (req, res, next) => {
   try {
     exigirAlguno(req)

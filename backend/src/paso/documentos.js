@@ -53,7 +53,22 @@ export async function guardarDocumentos(registros, usuario) {
   return guardados
 }
 
-export async function listarRealizados(guardados) {
+export function diaEnBogota(valor) {
+  if (!valor) return ""
+  const fecha = new Date(valor)
+  if (Number.isNaN(fecha.getTime())) {
+    const texto = String(valor)
+    return /^\d{4}-\d{2}-\d{2}/.test(texto) ? texto.slice(0, 10) : ""
+  }
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(fecha)
+}
+
+export async function listarRealizados(guardados, filtro = {}) {
   const fuente = guardados || await leerDocumentos()
   return Object.values(fuente)
     .filter((item) => item?.documento)
@@ -65,6 +80,12 @@ export async function listarRealizados(guardados) {
       usuario: item.usuario || null,
       fecha: item.fecha || null,
     }))
+    .filter((item) => {
+      const dia = diaEnBogota(item.fecha)
+      if (filtro.fecha) return dia === filtro.fecha
+      if (filtro.mes) return dia.startsWith(`${filtro.mes}-`)
+      return true
+    })
     .sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")))
 }
 

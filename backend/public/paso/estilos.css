@@ -98,7 +98,7 @@ h2 { font-size: 22px; }
   background: rgba(247, 250, 252, 0.96);
 }
 label { display: grid; gap: 6px; color: var(--soft); font-size: 14px; font-weight: 600; }
-input[type="text"], input[type="password"], input[type="file"], select {
+input[type="text"], input[type="password"], input[type="file"], input[type="date"], input[type="month"], select {
   min-height: 40px;
   padding: 8px 12px;
   border-radius: 12px;
@@ -110,6 +110,7 @@ input[type="text"], input[type="password"], input[type="file"], select {
 .secreto { margin-top: 8px; font-size: 13px; }
 .secreto a { color: var(--muted); }
 .perfiles { align-items: stretch; }
+[hidden] { display: none !important; }
 .btn {
   display: inline-flex;
   align-items: center;
