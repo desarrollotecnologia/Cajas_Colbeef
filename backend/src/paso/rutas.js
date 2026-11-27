@@ -223,7 +223,7 @@ rutasPaso.get("/despachos", async (req, res, next) => {
       mes: mes ? String(req.query.mes) : null,
       desde: fecha,
       hasta,
-      registros: await aplicarReferencias(totalizarPorCliente(registros), fecha),
+      registros: await aplicarReferencias(totalizarPorCliente(registros), mes ? "" : fecha),
     })
   } catch (error) {
     next(error)

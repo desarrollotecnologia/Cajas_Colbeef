@@ -138,7 +138,7 @@ function celdaReferencia(fila, editable) {
   const actual = REFERENCIAS.some(([codigo]) => codigo === fila.referencia) ? fila.referencia : "30-10-24"
   if (!editable) return `<td>${escapar(actual)}</td>`
   const opciones = REFERENCIAS.map(([codigo, etiqueta]) => `<option value="${codigo}"${codigo === actual ? " selected" : ""}>${etiqueta}</option>`).join("")
-  return `<td><select class="ref" data-cliente="${escapar(fila.cliente)}">${opciones}</select></td>`
+  return `<td><select class="ref" data-fecha="${escapar(fila.fecha || "")}" data-cliente="${escapar(fila.cliente)}">${opciones}</select></td>`
 }
 
 function celdaRecortada(texto) {
@@ -157,7 +157,7 @@ function tablaDespachos(registros, editable) {
       if (!editable) {
         return `<td>${fila.documentoSiimed ? escapar(fila.documentoSiimed) : '<span class="pendiente">Sin documento</span>'}</td>`
       }
-      return `<td><input class="doc" data-detalle="${fila.detalleId}" data-vehiculo="${fila.vehiculoId}" data-cliente="${escapar(fila.cliente)}" data-cantidad="${fila.cantidad ?? ""}" value="${escapar(fila.documentoSiimed || "")}" maxlength="40" placeholder="H7-403" /></td>`
+      return `<td><input class="doc" data-detalle="${fila.detalleId}" data-vehiculo="${fila.vehiculoId}" data-fecha="${escapar(fila.fecha || "")}" data-cliente="${escapar(fila.cliente)}" data-cantidad="${fila.cantidad ?? ""}" value="${escapar(fila.documentoSiimed || "")}" maxlength="40" placeholder="H7-403" /></td>`
     }).join("")
     return `<tr class="${fila.documentoSiimed ? "" : "pendiente"}">${celdas}</tr>`
   }).join("")
@@ -174,16 +174,16 @@ async function pantallaDespachos() {
     <p class="ayuda">${editable
       ? "Info SIRT: la fecha, el cliente, la cantidad y el resto de la tabla salen de SIRT. El documento SIMED y la referencia de la caja no vienen de allí; Logística los escribe en esta pantalla. El archivo lo carga Contabilidad."
       : "Revisa el documento SIMED que escribió Logística. Lo que está vacío todavía no tiene identificador."}</p>
+    <details class="desplegable realizado">
+      <summary>Realizados <span id="realizados-cuenta"></span></summary>
+      <div class="cuerpo" id="realizados-tabla"><p class="ayuda">Cargando los realizados.</p></div>
+    </details>
     <form id="consulta" class="acciones">
       ${filtroPeriodo()}
       <button class="btn btn-primary" type="submit">Consultar</button>
     </form>
     <p class="aviso" id="aviso"></p>
     <div id="tabla"></div>
-    <details class="desplegable realizado">
-      <summary>Realizados <span id="realizados-cuenta"></span></summary>
-      <div class="cuerpo" id="realizados-tabla"><p class="ayuda">Cargando los realizados.</p></div>
-    </details>
   `)
   enlazarPeriodo(vista.querySelector("#consulta"))
   cargarRealizados()
@@ -200,11 +200,10 @@ async function pantallaDespachos() {
         return
       }
       const pendientes = cuerpo.registros.filter((fila) => !fila.documentoSiimed).length
-      const puedeGuardar = editable && periodo.modo === "dia"
-      const guardar = puedeGuardar
-        ? `<div class="acciones"><button class="btn btn-primary" id="guardar" type="button">Guardar</button><span class="ayuda">${pendientes} sin documento</span></div>`
-        : `<p class="ayuda">${periodo.modo === "mes" ? `${escapar(cuerpo.desde)} al ${escapar(cuerpo.hasta)}. ` : ""}${cuerpo.registros.length - pendientes} con documento · ${pendientes} sin documento${periodo.modo === "mes" ? ". Para guardar, consulta el día." : ""}</p>`
-      vista.querySelector("#tabla").innerHTML = `${guardar}${tablaDespachos(cuerpo.registros, puedeGuardar)}<p class="aviso" id="aviso-tabla"></p>`
+      const guardar = editable
+        ? `<div class="acciones"><button class="btn btn-primary" id="guardar" type="button">Guardar</button><span class="ayuda">${periodo.modo === "mes" ? `${escapar(cuerpo.desde)} al ${escapar(cuerpo.hasta)} · ` : ""}${pendientes} sin documento</span></div>`
+        : `<p class="ayuda">${cuerpo.registros.length - pendientes} con documento · ${pendientes} sin documento</p>`
+      vista.querySelector("#tabla").innerHTML = `${guardar}${tablaDespachos(cuerpo.registros, editable)}<p class="aviso" id="aviso-tabla"></p>`
       vista.querySelector("#guardar")?.addEventListener("click", guardarDocumentos)
       pegarEncabezado()
     } catch (error) {
@@ -261,10 +260,10 @@ function periodoDe(formulario) {
 async function guardarDocumentos() {
   const aviso = vista.querySelector("#aviso-tabla")
   const boton = vista.querySelector("#guardar")
-  const fecha = vista.querySelector("#consulta [name=fecha]").value
-  const referenciaDe = new Map([...vista.querySelectorAll(".ref")].map((campo) => [campo.dataset.cliente, campo.value]))
+  const referenciaDe = new Map([...vista.querySelectorAll(".ref")].map((campo) => [`${campo.dataset.fecha}|${campo.dataset.cliente}`, campo.value]))
   const registros = [...vista.querySelectorAll(".doc")].map((campo) => {
     const cliente = campo.dataset.cliente || ""
+    const fecha = campo.dataset.fecha || vista.querySelector("#consulta [name=fecha]").value
     const cantidad = campo.dataset.cantidad
     return {
       detalleId: Number(campo.dataset.detalle),
@@ -273,7 +272,7 @@ async function guardarDocumentos() {
       fecha,
       cliente,
       cantidad: cantidad === "" ? null : Number(cantidad),
-      referencia: /olimp/i.test(cliente) ? "30-10-100019" : (referenciaDe.get(cliente) || "30-10-24"),
+      referencia: /olimp/i.test(cliente) ? "30-10-100019" : (referenciaDe.get(`${fecha}|${cliente}`) || "30-10-24"),
     }
   })
   boton.disabled = true

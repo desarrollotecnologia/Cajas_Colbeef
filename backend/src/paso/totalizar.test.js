@@ -42,6 +42,18 @@ test("lista las referencias de las cajas cuando el cliente tiene varias", () => 
   assert.equal(resultado[0].referencia, "30-10-24 | 30-10-100019")
 })
 
+test("separa al mismo cliente cuando los despachos son de otra fecha", () => {
+  const resultado = totalizarPorCliente([
+    { cliente: "CLIENTE", fecha: "2026-11-01T17:00:00.000Z", lote: "L1", cantidad: 1, pesoLote: 10 },
+    { cliente: "CLIENTE", fecha: "2026-11-01T20:00:00.000Z", lote: "L2", cantidad: 1, pesoLote: 10 },
+    { cliente: "CLIENTE", fecha: "2026-11-02T17:00:00.000Z", lote: "L3", cantidad: 1, pesoLote: 10 },
+  ])
+
+  assert.equal(resultado.length, 2)
+  assert.equal(resultado[0].lote, "VARIOS")
+  assert.equal(resultado[1].lote, "L3")
+})
+
 test("no cuenta dos veces una caja relacionada con varios detalles", () => {
   const resultado = totalizarPorCliente([
     { detalleId: 1, vehiculoId: 10, cliente: "CLIENTE", lote: "LOTE", cantidad: 1, pesoLote: 20, cajasDespachadas: [{ id: 100, peso: 20 }] },

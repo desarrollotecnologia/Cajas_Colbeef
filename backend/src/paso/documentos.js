@@ -68,6 +68,19 @@ export function diaEnBogota(valor) {
   }).format(fecha)
 }
 
+function compararDocumento(a, b) {
+  const partes = (valor) => {
+    const texto = String(valor || "").trim().toUpperCase()
+    const corte = texto.match(/^(.*?)(\d+)$/)
+    return corte ? [corte[1], Number(corte[2])] : [texto, 0]
+  }
+  const [prefijoA, numeroA] = partes(a.documento)
+  const [prefijoB, numeroB] = partes(b.documento)
+  const prefijo = prefijoA.localeCompare(prefijoB, "es")
+  if (prefijo) return prefijo
+  return numeroA - numeroB
+}
+
 export async function listarRealizados(guardados, filtro = {}) {
   const fuente = guardados || await leerDocumentos()
   return Object.values(fuente)
@@ -86,7 +99,7 @@ export async function listarRealizados(guardados, filtro = {}) {
       if (filtro.mes) return dia.startsWith(`${filtro.mes}-`)
       return true
     })
-    .sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")))
+    .sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")) || compararDocumento(a, b))
 }
 
 export async function registrosParaCruce(guardados) {

@@ -29,10 +29,25 @@ function cajasUnicas(registros) {
   return [...cajas.values()]
 }
 
+function diaDe(valor) {
+  if (!valor) return ""
+  const texto = String(valor)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(texto)) return texto
+  const fecha = new Date(valor)
+  if (Number.isNaN(fecha.getTime())) return texto.slice(0, 10)
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(fecha)
+}
+
 export function totalizarPorCliente(registros) {
   const grupos = new Map()
   for (const registro of registros) {
-    const clave = registro.cliente || "Cliente sin identificar"
+    const cliente = registro.cliente || "Cliente sin identificar"
+    const clave = `${diaDe(registro.fecha)}|${cliente}`
     if (!grupos.has(clave)) grupos.set(clave, [])
     grupos.get(clave).push(registro)
   }

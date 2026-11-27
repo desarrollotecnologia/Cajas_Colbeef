@@ -57,11 +57,25 @@ export async function guardarReferencias(registros, usuario) {
   return guardados
 }
 
+function diaDe(valor) {
+  const texto = String(valor || "")
+  if (/^\d{4}-\d{2}-\d{2}/.test(texto) && !texto.includes("T")) return texto.slice(0, 10)
+  const fecha = new Date(valor)
+  if (Number.isNaN(fecha.getTime())) return ""
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(fecha)
+}
+
 export async function aplicarReferencias(registros, fecha, guardados) {
   const fuente = guardados || await leerReferencias()
   return registros.map((fila) => {
-    if (esOlimpica(fila.cliente)) return { ...fila, referencia: "30-10-100019" }
-    const guardado = fuente[claveReferencia(fecha, fila.cliente)]
-    return { ...fila, referencia: guardado?.referencia || fila.referencia || "30-10-24" }
+    const dia = fecha || diaDe(fila.fecha)
+    if (esOlimpica(fila.cliente)) return { ...fila, fecha: dia || fila.fecha, referencia: "30-10-100019" }
+    const guardado = fuente[claveReferencia(dia, fila.cliente)]
+    return { ...fila, fecha: dia || fila.fecha, referencia: guardado?.referencia || fila.referencia || "30-10-24" }
   })
 }
